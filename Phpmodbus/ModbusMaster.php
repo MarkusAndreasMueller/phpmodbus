@@ -145,10 +145,11 @@ class ModbusMaster {
     $lastAccess = time();
     while (socket_select($readsocks, 
             $writesocks, 
-            $exceptsocks,
-            0, 
-            300000) !== FALSE) {
-            $this->status .= "Wait data ... \n";
+            $exceptsocks, 
+            $this->timeout_sec,
+            0) !== FALSE)                                       // ursprünglich 300000us = 300s = 5min ?! blockiert socket_select falls keine Daten kommen. Das ist für eine Abfrage sehr lange!
+    {                                   
+        $this->status .= "Wait data ... \n";                    // Fehlermeldung alle ~2h 20min: "Datei: /usr/local/edomi/main/include/php/ModbusMaster.php | Fehlercode: 1 | Zeile: 151 | Allowed memory size of 67108864 bytes exhausted (tried to allocate 4392558 bytes)" Vermutlich weil die Verbindung unterbrochen war und die while immer wieder lief.
         if (in_array($this->sock, $readsocks)) {
             while (@socket_recv($this->sock, $rec, 2000, 0)) {
                 $this->status .= "Data received\n";
@@ -160,6 +161,7 @@ class ModbusMaster {
                 throw new Exception( "Watchdog time expired [ " .
                   $this->timeout_sec . " sec]!!! Connection to " . 
                   $this->host . " is not established.");
+                  return $rec;                                    // return bei Timeout hinzugefügt, ansonsten startet die ursprüngliche while von oben
             }
         }
         $readsocks[] = $this->sock;
